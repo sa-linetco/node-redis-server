@@ -44,7 +44,8 @@ const childprocess = require('child_process');
 const events = require('events');
 const PromiseQueue = require('promise-queue');
 const regExp = {
-  terminalMessage: /ready\s+to\s+accept|already\s+in\s+use|not\s+listen|error|denied|can't/im,
+  startupMessage: /ready\s+to\s+accept/im,
+  startupFailedMessage: /already\s+in\s+use|not\s+listen|error|denied|can't/im,
   warningMessage: /can't\s+set\s+maximum\s+open\s+files/im,
   errorMessage: /#\s+(.*error|can't.*)/im,
   singleWhiteSpace: /\s/g,
@@ -132,24 +133,37 @@ class RedisServer extends events.EventEmitter {
    * @return {Object}
    */
   static parseData(string) {
-    const matches = regExp.terminalMessage.exec(string);
+    const startupMatches = regExp.startupMessage.exec(string);
+    var startupDetected = false;
+    if (startupMatches) {
+      startupDetected = startupMatches
+        .pop()
+        .replace(regExp.singleWhiteSpace, '')
+        .toLowerCase() === 'readytoaccept';
+    }
 
-    if (matches === null || regExp.warningMessage.test(string)) {
+    if (startupDetected) {
+      return {
+        err: null,
+        key: 'readytoaccept'
+      };
+    }
+
+    const startupFailedMatches = regExp.startupFailedMessage.exec(string);
+    const warningMatches = regExp.warningMessage.test(string);
+    if (startupFailedMatches === null || warningMatches) {
       return null;
     }
 
     const result = {
       err: null,
-      key: matches
+      key: startupFailedMatches
         .pop()
         .replace(regExp.singleWhiteSpace, '')
         .toLowerCase()
     };
 
     switch (result.key) {
-      case 'readytoaccept':
-        break;
-
       case 'alreadyinuse':
         result.err = new Error('Address already in use');
         result.err.code = -1;

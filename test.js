@@ -2,6 +2,7 @@
 
 const childprocess = require('child_process');
 const fs = require('fs');
+const path = require('path');
 const chai = require('chai');
 const mocha = require('mocha');
 const RedisServer = require('./RedisServer');
@@ -302,6 +303,14 @@ describe('RedisServer', () => {
       );
 
       expect(result).to.equal(null);
+    });
+    it('detects a successful startup even if the output is received all at once with the "Server can\'t set maximum open files" error', () => {
+      const startupOutputFilePath = path.join(__dirname, 'test_data', 'startup_output_with_cant_set_maximum_open_files_error');
+      const startupOutputWithCantSetMaximumOpenFilesError = fs.readFileSync(startupOutputFilePath, 'utf8');
+
+      const result = RedisServer.parseData(startupOutputWithCantSetMaximumOpenFilesError);
+      expect(result).to.be.an('object').and.have.property('err');
+      expect(result.err).to.equal(null);
     });
   });
   describe('#constructor()', () => {
